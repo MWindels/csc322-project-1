@@ -4,7 +4,7 @@ import re
 Tokenizes a boolean formula expressed as a string.
 
 The valid tokens are paraentheses, negation (~), conjunction (&), disjunction (v), material
-implication (->), and variables (x[1-9][0-9]*).  All whitespace is ignored.
+implication (->), and variables (A[1-9][0-9]*).  All whitespace is ignored.
 
 Parameters
 ----------
@@ -32,10 +32,10 @@ def tokenize(formula_str):
 			if next_ch == '-' and working_str[1] == '>':
 				tokens.append('->')
 				working_str = working_str[2:]
-			elif next_ch == 'x':
+			elif next_ch == 'A':
 				var_num = re.match('[1-9][0-9]*', working_str[1:])	# Note that match(...) checks at the beginning of the string.
 				if var_num is not None:
-					tokens.append('x' + var_num.group())
+					tokens.append('A' + var_num.group())
 					working_str = working_str[(1 + var_num.span()[1]):]
 				else:
 					return tokens, False
