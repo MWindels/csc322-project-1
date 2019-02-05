@@ -212,36 +212,7 @@ class ParseTree:
 		return negations, final_node
 	
 	'''
-	This function descends the ParseTree and simplifies double negations.
-	'''
-	def double_negate(self):
-		n_count, non_negation = self.__count_negations(self.root)
-		if n_count > 0:
-			if n_count % 2 == 0:
-				self.__replace_parent(non_negation)
-			else:
-				self.__replace_parent(non_negation, new_parent=self.root)
-		
-		stack = [non_negation]
-		while len(stack) > 0:
-			current = stack.pop()
-			if type(current) == Disjunction or type(current) == Conjunction:
-				ln_count, left_non_negation = self.__count_negations(current.left)
-				rn_count, right_non_negation = self.__count_negations(current.right)
-				stack.extend([left_non_negation, right_non_negation])
-				if ln_count > 0:
-					if ln_count % 2 == 0:
-						self.__replace_parent(left_non_negation, new_parent=current, left_child=True)
-					else:
-						self.__replace_parent(left_non_negation, new_parent=current.left)
-				if rn_count > 0:
-					if rn_count % 2 == 0:
-						self.__replace_parent(right_non_negation, new_parent=current, left_child=False)
-					else:
-						self.__replace_parent(right_non_negation, new_parent=current.right)
-	
-	'''
-	This function descends the ParseTree and applies De Morgan's laws and double negation.
+	This function descends the ParseTree, applies De Morgan's laws, and simplifies double negations.
 	
 	This has the effect of pushing all negations down to the variables.
 	'''
