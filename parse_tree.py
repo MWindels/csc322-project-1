@@ -32,6 +32,7 @@ class ParseTree:
 		If an error occurs while parsing the formula.
 	'''
 	def __init__(self, formula):
+		self.__connective_count = 0
 		self.__tokens, valid = tok.tokenize(formula)
 		if not valid:
 			if len(self.__tokens) > 0:
@@ -50,6 +51,18 @@ class ParseTree:
 	'''
 	def __str__(self):
 		return str(self.root)
+	
+	'''
+	Pre-increments __connective_count because Python doesn't support unary ++.
+	
+	Returns
+	-------
+	__connective_count : int
+		The value of __connective_count after incrementing.
+	'''
+	def __inc_cc(self):
+		self.__connective_count += 1
+		return self.__connective_count
 	
 	'''
 	Returns the next token to be parsed.
@@ -93,7 +106,7 @@ class ParseTree:
 		token, t_valid = self.__next_token()
 		if t_valid and token == '->':
 			self.__next_token(consume=True)
-			return Disjunction(Negation(left), self.__implication())
+			return Disjunction(self.__inc_cc(), Negation(left), self.__implication())
 		else:
 			return left
 	
@@ -107,7 +120,7 @@ class ParseTree:
 		token, t_valid = self.__next_token()
 		if t_valid and token == 'v':
 			self.__next_token(consume=True)
-			return Disjunction(left, self.__disjunction())
+			return Disjunction(self.__inc_cc(), left, self.__disjunction())
 		else:
 			return left
 	
@@ -121,7 +134,7 @@ class ParseTree:
 		token, t_valid = self.__next_token()
 		if t_valid and token == '&':
 			self.__next_token(consume=True)
-			return Conjunction(left, self.__conjunction())
+			return Conjunction(self.__inc_cc(), left, self.__conjunction())
 		else:
 			return left
 	
@@ -225,9 +238,9 @@ class ParseTree:
 				self.__replace_parent(non_negation, current[1], current[2])
 			else:
 				if type(non_negation) == Disjunction:
-					self.__replace_parent(Conjunction(Negation(non_negation.left), Negation(non_negation.right)), current[1], current[2])
+					self.__replace_parent(Conjunction(non_negation.original_id(), Negation(non_negation.left), Negation(non_negation.right)), current[1], current[2])
 				elif type(non_negation) == Conjunction:
-					self.__replace_parent(Disjunction(Negation(non_negation.left), Negation(non_negation.right)), current[1], current[2])
+					self.__replace_parent(Disjunction(non_negation.original_id(), Negation(non_negation.left), Negation(non_negation.right)), current[1], current[2])
 				else:
 					self.__replace_parent(non_negation, current[0])
 			
@@ -239,30 +252,93 @@ class ParseTree:
 						stack.extend([(current[1].right.left, current[1].right, True), (current[1].right.right, current[1].right, False)])
 				else:
 					stack.extend([(self.root.left, self.root, True), (self.root.right, self.root, False)])
+	
+	'''
+	This function returns a new ParseTree which is the negation of the current ParseTree in CNF form.
+	A polynomial time algorithm is used to convert to CNF.  Also literalizes() the current ParseTree.
+	
+	Returns
+	-------
+	new_tree : ParseTree
+		A new ParseTree in CNF form corresponding to the negation of the original.
+	'''
+	def poly_ncnf(self):
+		new_tree = ParseTree('')	#Creates an empty tree.
+		if self.root is not None:
+			proper_root = self.__count_negations(self.root)[1]
+			new_tree.root = Negation(Variable(proper_root.original_id())) if type(proper_root) != Variable else Negation(Variable(self.__connective_count + proper_root.original_id()))	#This variable represents ~A_all.
+			self.literalize()
+			
+			stack = [self.root]
+			while len(stack) > 0:
+				current = stack.pop()
+				if type(current) == Disjunction or type(current) == Conjunction:
+					x_current = Variable(current.original_id())
+					
+					ln_count, left = self.__count_negations(current.left)
+					x_left = Variable(left.original_id()) if type(left) != Variable else Variable(self.__connective_count + left.original_id())
+					if ln_count % 2 == 1:
+						x_left = Negation(x_left)
+					
+					rn_count, right = self.__count_negations(current.right)
+					x_right = Variable(right.original_id()) if type(right) != Variable else Variable(self.__connective_count + right.original_id())
+					if rn_count % 2 == 1:
+						x_right = Negation(x_right)
+					
+					if type(current) == Disjunction:
+						clause_1 = Disjunction(new_tree.__inc_cc(), Negation(x_current), Disjunction(new_tree.__inc_cc(), x_left, x_right))	#False & False -> False
+						clause_2 = Disjunction(new_tree.__inc_cc(), x_current, Disjunction(new_tree.__inc_cc(), x_left, Negation(x_right)))	#False & True -> True
+						clause_3 = Disjunction(new_tree.__inc_cc(), x_current, Disjunction(new_tree.__inc_cc(), Negation(x_left), x_right))	#True & False -> True
+						clause_4 = Disjunction(new_tree.__inc_cc(), x_current, Disjunction(new_tree.__inc_cc(), Negation(x_left), Negation(x_right)))	#True / True -> True
+						new_tree.root = Conjunction(new_tree.__inc_cc(), clause_1, Conjunction(new_tree.__inc_cc(), clause_2, Conjunction(new_tree.__inc_cc(), clause_3, Conjunction(new_tree.__inc_cc(), clause_4, new_tree.root))))
+					else:	#Implicity means current is a Conjunction.
+						clause_1 = Disjunction(new_tree.__inc_cc(), Negation(x_current), Disjunction(new_tree.__inc_cc(), x_left, x_right))	#False & False -> False
+						clause_2 = Disjunction(new_tree.__inc_cc(), Negation(x_current), Disjunction(new_tree.__inc_cc(), x_left, Negation(x_right)))	#False & True -> False
+						clause_3 = Disjunction(new_tree.__inc_cc(), Negation(x_current), Disjunction(new_tree.__inc_cc(), Negation(x_left), x_right))	#True & False -> False
+						clause_4 = Disjunction(new_tree.__inc_cc(), x_current, Disjunction(new_tree.__inc_cc(), Negation(x_left), Negation(x_right)))	#True & True -> True
+						new_tree.root = Conjunction(new_tree.__inc_cc(), clause_1, Conjunction(new_tree.__inc_cc(), clause_2, Conjunction(new_tree.__inc_cc(), clause_3, Conjunction(new_tree.__inc_cc(), clause_4, new_tree.root))))
+					
+					if type(left) == Disjunction or type(left) == Conjunction:
+						stack.append(left)
+					
+					if type(right) == Disjunction or type(right) == Conjunction:
+						stack.append(right)
+		
+		new_tree.literalize()	#Used for simplifying the double negations that might appear on some variables.
+		return new_tree
+		
 
 '''
-This object represents a disjunction (internal) node in a ParseTree.
+This object represents a disjunction node (internal) in a ParseTree.
 '''
 class Disjunction:
 	
-	def __init__(self, l, r):
+	def __init__(self, c_id, l, r):
+		self.connective_id = 2 * c_id + 1
 		self.left = l
 		self.right = r
 	
 	def __str__(self):
 		return '(' + str(self.left) + ' v ' + str(self.right) + ')'
+	
+	def original_id(self):
+		return (self.connective_id - 1) // 2
 
 '''
 This object represents a conjunction node (internal) in a ParseTree.
 '''
 class Conjunction:
 	
-	def __init__(self, l, r):
+	def __init__(self, c_id, l, r):
+		self.connective_id = 2 * c_id + 1
 		self.left = l
 		self.right = r
 	
 	def __str__(self):
 		return '(' + str(self.left) + ' & ' + str(self.right) + ')'
+	
+	def original_id(self):
+		return (self.connective_id - 1) // 2
 
 '''
 This object represents a negation node (internal) in a ParseTree.
@@ -281,7 +357,10 @@ This object represents a variable node (a leaf) in a ParseTree.
 class Variable:
 	
 	def __init__(self, v_id):
-		self.var_id = v_id
+		self.var_id = 2 * v_id
 	
 	def __str__(self):
-		return 'A' + str(self.var_id)
+		return 'A' + str(self.var_id // 2)
+	
+	def original_id(self):
+		return self.var_id // 2
