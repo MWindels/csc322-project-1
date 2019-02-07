@@ -1,3 +1,4 @@
+import subprocess
 import tokenizer as tok
 
 '''
@@ -254,34 +255,37 @@ class ParseTree:
 					stack.extend([(self.root.left, self.root, True), (self.root.right, self.root, False)])
 	
 	'''
-	This function returns a new ParseTree which is the negation of the current ParseTree in CNF form.
-	A polynomial time algorithm is used to convert to CNF.  Also literalizes() the current ParseTree.
+	This function returns a new ParseTree which is the negation of the current ParseTree in CNF.
+	The space of the resulting ParseTree is polynomial with respect to the original.
 	
 	Returns
 	-------
 	new_tree : ParseTree
-		A new ParseTree in CNF form corresponding to the negation of the original.
+		A new ParseTree in CNF corresponding to the negation of the original.
 	'''
 	def poly_ncnf(self):
 		new_tree = ParseTree('')	#Creates an empty tree.
 		if self.root is not None:
-			proper_root = self.__count_negations(self.root)[1]
-			new_tree.root = Negation(Variable(proper_root.original_id())) if type(proper_root) != Variable else Negation(Variable(self.__connective_count + proper_root.original_id()))	#This variable represents ~A_all.
-			self.literalize()
+			literalized_self = ParseTree(str(self))
+			assert(self.__connective_count == literalized_self.__connective_count)
+			literalized_self.literalize()
 			
-			stack = [self.root]
+			proper_root = literalized_self.__count_negations(literalized_self.root)[1]
+			new_tree.root = Negation(Variable(proper_root.original_id())) if type(proper_root) != Variable else Negation(Variable(literalized_self.__connective_count + proper_root.original_id()))	#This variable represents ~A_all.
+			
+			stack = [literalized_self.root]
 			while len(stack) > 0:
 				current = stack.pop()
 				if type(current) == Disjunction or type(current) == Conjunction:
 					x_current = Variable(current.original_id())
 					
-					ln_count, left = self.__count_negations(current.left)
-					x_left = Variable(left.original_id()) if type(left) != Variable else Variable(self.__connective_count + left.original_id())
+					ln_count, left = literalized_self.__count_negations(current.left)
+					x_left = Variable(left.original_id()) if type(left) != Variable else Variable(literalized_self.__connective_count + left.original_id())
 					if ln_count % 2 == 1:
 						x_left = Negation(x_left)
 					
-					rn_count, right = self.__count_negations(current.right)
-					x_right = Variable(right.original_id()) if type(right) != Variable else Variable(self.__connective_count + right.original_id())
+					rn_count, right = literalized_self.__count_negations(current.right)
+					x_right = Variable(right.original_id()) if type(right) != Variable else Variable(literalized_self.__connective_count + right.original_id())
 					if rn_count % 2 == 1:
 						x_right = Negation(x_right)
 					
@@ -306,7 +310,75 @@ class ParseTree:
 		
 		new_tree.literalize()	#Used for simplifying the double negations that might appear on some variables.
 		return new_tree
+	
+	'''
+	Converts a ParseTree in (literalized) CNF to the DIMACS format.
+	
+	Returns
+	-------
+	dimacs_formula : string
+		The CNF ParseTree in the DIMACS format.
+	
+	Raises
+	------
+	ValueError
+		If the ParseTree is not in CNF.
+	'''
+	def dimacs(self):
+		clauses = []
+		stack = [self.root]
+		while len(stack) > 0:
+			current = stack.pop()
+			if type(current) == Conjunction:
+				stack.extend([current.left, current.right])
+			else:
+				clauses.append(current)
 		
+		max_var = 0
+		dimacs_formula = ''
+		for c in clauses:
+			clause_stack = [c]
+			while len(clause_stack) > 0:
+				current = clause_stack.pop()
+				if type(current) == Disjunction:
+					clause_stack.extend([current.left, current.right])
+				elif type(current) == Conjunction:
+					raise ValueError('Formula is not in CNF.')
+				else:
+					n_count, non_negation = self.__count_negations(current)
+					if max_var < non_negation.original_id():
+						max_var = non_negation.original_id()
+					if n_count % 2 == 0:
+						dimacs_formula += str(non_negation.original_id()) + ' '
+					else:
+						dimacs_formula += '-' + str(non_negation.original_id()) + ' '
+			dimacs_formula += '0\n'
+		
+		return 'p cnf ' + str(max_var) + ' ' + str(len(clauses)) + '\n' + dimacs_formula
+	
+	'''
+	Checks whether or not the ParseTree is valid using minisat.  Note that minisat is assumed to
+	be installed and available either in the current working directory, or through the PATH variable.
+	
+	Returns
+	-------
+	is_valid : boolean
+		Whether or not the formula in the ParseTree is valid.
+	
+	Raises
+	------
+	IOError
+		If minisat returns an unrecognized return code.
+	'''
+	def is_valid(self):
+		minisat = subprocess.Popen('minisat', stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		minisat.communicate(input=self.poly_ncnf().dimacs().encode())
+		if minisat.returncode == 20:
+			return True
+		elif minisat.returncode == 10:
+			return False
+		else:
+			raise IOError('Minisat returned unknown code.')
 
 '''
 This object represents a disjunction node (internal) in a ParseTree.
