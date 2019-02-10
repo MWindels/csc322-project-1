@@ -365,18 +365,34 @@ class ParseTree:
 	is_valid : boolean
 		Whether or not the formula in the ParseTree is valid.
 	
+	var_assigns : dictionary
+		A dictionary of variable assignments which makes the formula in the ParseTree invalid.
+		The dictionary's keys are the variables, and the values are True or False assignments.
+	
 	Raises
 	------
 	IOError
 		If minisat returns an unrecognized return code.
 	'''
 	def is_valid(self):
-		minisat = subprocess.Popen('minisat', stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		minisat.communicate(input=self.poly_ncnf().dimacs().encode())
+		with open('minisat_in.txt', 'w') as mini_in, open('minisat_out.txt', 'w') as mini_out:	#First we need to ready the input, and clear the output file.
+			mini_in.write(self.poly_ncnf().dimacs())
+		
+		minisat = subprocess.Popen(['minisat', 'minisat_in.txt', 'minisat_out.txt'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		minisat.communicate()
 		if minisat.returncode == 20:
-			return True
+			return True, {}
 		elif minisat.returncode == 10:
-			return False
+			with open('minisat_out.txt', 'r') as mini_out:
+				var_assigns = {}
+				for var in mini_out.read().split()[1:]:
+					int_var = int(var)
+					if abs(int_var) > self.__connective_count:
+						if int_var > 0:
+							var_assigns[int_var - self.__connective_count] = True
+						elif int_var < 0:
+							var_assigns[-int_var - self.__connective_count] = False
+				return False, var_assigns
 		else:
 			raise IOError('Minisat returned unknown code.')
 

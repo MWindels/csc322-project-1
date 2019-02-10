@@ -21,11 +21,14 @@ if __name__ == '__main__':
 			total_formula += '->'
 		total_formula += '(' + formula + ')'
 		
-		if pt.ParseTree(total_formula).is_valid():
+		validity, assignments = pt.ParseTree(total_formula).is_valid()
+		if validity:
 			print('Formula IS valid given the axioms.')
 		else:
 			print('Formula IS NOT valid given the axioms.')
+			assignments_str = 'Assignment of the variables which shows invalidity: '
+			for k, v in assignments.items():
+				assignments_str += 'A' + str(k) + ' = ' + str(v) + ', '
+			print(assignments_str[:(len(assignments_str) - 2)])
 	except pt.ParseError as e:
 		print('Incorrectly formatted formula: ' + e.message)
-	except IOError as e:
-		print(e.message)
