@@ -226,6 +226,27 @@ class ParseTree:
 		return negations, final_node
 	
 	'''
+	This function returns a list of variable IDs used in a ParseTree.
+	
+	Returns
+	-------
+	used_vars : list
+		A list of integer IDs for each variable used in the ParseTree.
+	'''
+	def __used_variables(self):
+		used_vars = []
+		if self.root is not None:
+			stack = [self.root]
+			while len(stack) > 0:
+				current = stack.pop()
+				non_negation = self.__count_negations(current)[1]
+				if type(non_negation) != Variable:
+					stack.extend([non_negation.left, non_negation.right])
+				else:
+					used_vars.append(non_negation.original_id())
+		return used_vars
+	
+	'''
 	This function descends the ParseTree, applies De Morgan's laws, and simplifies double negations.
 	
 	This has the effect of pushing all negations down to the variables.
@@ -385,9 +406,10 @@ class ParseTree:
 		elif minisat.returncode == 10:
 			with open('minisat_out.txt', 'r') as mini_out:
 				var_assigns = {}
+				used_vars = self.__used_variables()
 				for var in mini_out.read().split()[1:]:
 					int_var = int(var)
-					if abs(int_var) > self.__connective_count:
+					if (abs(int_var) - self.__connective_count) in used_vars:
 						if int_var > 0:
 							var_assigns[int_var - self.__connective_count] = True
 						elif int_var < 0:

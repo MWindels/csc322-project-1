@@ -1,34 +1,51 @@
+import collections
 import parse_tree as pt
 
 if __name__ == '__main__':
-	try:
-		print('Input a boolean formula:\n')
-		formula = input()
+	inputs = []
+	raw_inputs = input().split(',')
+	for ri in raw_inputs:
+		if len(ri.lstrip()) > 0:
+			inputs.append(ri)
+	
+	if len(inputs) > 0:
+		formula = inputs[-1]
+		axioms = inputs[:(len(inputs) - 1)]
 		
-		axioms = []
-		print('Input 0 or more axioms:\n')
-		axioms.append(input())
-		while axioms[-1].lstrip() != '':
-			axioms.append(input())
-		
-		axioms = axioms[:(len(axioms) - 1)]
-		total_formula = ''
+		full_formula = ''
 		if len(axioms) > 0:
 			for i, a in enumerate(axioms):
-				total_formula += '(' + a + ')'
+				full_formula += '(' + a + ')'
 				if i < len(axioms) - 1:
-					total_formula += '&'
-			total_formula += '->'
-		total_formula += '(' + formula + ')'
+					full_formula += '&'
+			full_formula += '->'
+		full_formula += '(' + formula + ')'
 		
-		validity, assignments = pt.ParseTree(total_formula).is_valid()
-		if validity:
-			print('Formula IS valid given the axioms.')
-		else:
-			print('Formula IS NOT valid given the axioms.')
-			assignments_str = 'Assignment of the variables which shows invalidity: '
-			for k, v in assignments.items():
-				assignments_str += 'A' + str(k) + ' = ' + str(v) + ', '
-			print(assignments_str[:(len(assignments_str) - 2)])
-	except pt.ParseError as e:
-		print('Incorrectly formatted formula: ' + e.message)
+		try:
+			validity, assignments = pt.ParseTree(full_formula).is_valid()
+			if validity:
+				print('Formula IS valid given the axioms.')
+			else:
+				print('Formula IS NOT valid given the axioms.')
+				assignments_str = 'Assignment of the variables which shows invalidity: '
+				sorted_assignments = collections.OrderedDict(sorted(assignments.items(), key=lambda kv_pair: kv_pair[0]))
+				for i, (k, v) in enumerate(sorted_assignments.items()):
+					assignments_str += 'A' + str(k) + ' = ' + str(v)
+					if i < len(sorted_assignments) - 1:
+						assignments_str += ', '
+					else:
+						assignments_str += '.'
+				print(assignments_str)
+		except pt.ParseError as e:
+			user_error = False
+			for i, a in enumerate(axioms):
+				try:
+					pt.ParseTree(a)
+				except pt.ParseError as e_user:
+					print('Formula ' + str(i + 1) + ' was formatted incorrectly: ' + e_user.message)
+					user_error = True
+					break
+			if not user_error:
+				print('Formatting error occurred internally.')	#Should never see this, but just in case...
+	else:
+		print('Must input at least one boolean formula.')
