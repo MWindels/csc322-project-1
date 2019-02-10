@@ -38,9 +38,9 @@ if __name__ == '__main__':
 				print(assignments_str)
 		except pt.ParseError as e:
 			user_error = False
-			for i, a in enumerate(axioms):
+			for i, f in enumerate(inputs):
 				try:
-					pt.ParseTree(a)
+					pt.ParseTree(f)
 				except pt.ParseError as e_user:
 					print('Formula ' + str(i + 1) + ' was formatted incorrectly: ' + e_user.message)
 					user_error = True
