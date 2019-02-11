@@ -233,7 +233,7 @@ class ParseTree:
 	used_vars : list
 		A list of integer IDs for each variable used in the ParseTree.
 	'''
-	def __used_variables(self):
+	def used_variables(self):
 		used_vars = []
 		if self.root is not None:
 			stack = [self.root]
@@ -406,7 +406,7 @@ class ParseTree:
 		elif minisat.returncode == 10:
 			with open('minisat_out.txt', 'r') as mini_out:
 				var_assigns = {}
-				used_vars = self.__used_variables()
+				used_vars = self.used_variables()
 				for var in mini_out.read().split()[1:]:
 					int_var = int(var)
 					if (abs(int_var) - self.__connective_count) in used_vars:

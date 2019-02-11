@@ -26,15 +26,12 @@ if __name__ == '__main__':
 			if validity:
 				print('Formula IS valid given the axioms.')
 			else:
-				print('Formula IS NOT valid given the axioms.')
-				assignments_str = 'Assignment of the variables which shows invalidity: '
+				assignments_str = ''
 				sorted_assignments = collections.OrderedDict(sorted(assignments.items(), key=lambda kv_pair: kv_pair[0]))
 				for i, (k, v) in enumerate(sorted_assignments.items()):
-					assignments_str += 'A' + str(k) + ' = ' + str(v)
+					assignments_str += 'A' + str(k) + ' = ' + ('T' if v else 'F')
 					if i < len(sorted_assignments) - 1:
 						assignments_str += ', '
-					else:
-						assignments_str += '.'
 				print(assignments_str)
 		except pt.ParseError as e:
 			user_error = False
