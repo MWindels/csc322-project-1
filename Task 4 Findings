@@ -1,0 +1,5 @@
+While testing vcheck4 with different formulas,
+both valid and not valid I found that for certain small formulas like,
+(A1->A2)->(~A1vA2) the brute force method was faster then the minisat but as the complexity grew,
+or more importantly as the amount of variables increased,
+the brute force method became exponentially slower compared to the minisat.
